@@ -121,6 +121,8 @@ class Statsd
       @port = port || 8126
       # protects @socket transactions
       @s_mu = Mutex.new
+      @socket = nil
+
       connect
     end
 
@@ -220,7 +222,11 @@ class Statsd
     end
 
     def connect
-      @s_mu.synchronize { @socket = TCPSocket.new(host, port) }
+      @s_mu.synchronize do
+        @socket.close if @socket
+
+        @socket = TCPSocket.new(host, port)
+      end
     end
   end
 
@@ -255,6 +261,7 @@ class Statsd
     @prefix = nil
     @batch_size = 10
     @postfix = nil
+    @socket = nil
     connect
   end
 
@@ -385,7 +392,7 @@ class Statsd
   #     batch.gauge('user.count', User.count)
   #   end
   def batch(&block)
-    Batch.new(self).easy &block
+    Batch.new(self).easy(&block)
   end
 
   # Reconnects the socket, useful if the address of the statsd has changed. This
@@ -420,7 +427,9 @@ class Statsd
   end
 
   def connect
-    @socket = UDPSocket.new Addrinfo.udp(@host, @port).afamily
+    @socket.close if @socket
+
+    @socket = UDPSocket.new Addrinfo.udp(host, port).afamily
     @socket.connect host, port
   end
 end
